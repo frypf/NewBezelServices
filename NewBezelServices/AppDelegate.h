@@ -8,11 +8,22 @@
 
 #import <Cocoa/Cocoa.h>
 #import "HUDWindowController.h"
+#import "VolumeKeyTap.h"
+
+@class HUDWindowController;
+
+@interface NSAppSubclass : NSApplication;
+
+@property (readwrite) HUDWindowController *hudCtrl;
+
+@end
+
 
 @interface AppDelegate : NSObject <NSApplicationDelegate, NSXPCListenerDelegate>
 {
     HUDWindowController *_hudCtrl;
     NSXPCListener *_listener;
+    SPMediaKeyTap *keyTap;
+    CGEventSourceRef _eventSource;
 }
-
 @end

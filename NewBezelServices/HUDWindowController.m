@@ -10,18 +10,7 @@
 #import "VolumeControl.h"
 #import "BrightnessControl.h"
 #import "NSImage+ColorInvert.h"
-
-#define kDefaultVolumeSoundPath @"/System/Library/LoginPlugins/BezelServices.loginPlugin/Contents/Resources/volume.aiff"
-
-#ifdef DEBUG
-# define kHUDHorizontalBias  330
-# define kHUDVerticalBias    45
-#else
-# define kHUDHorizontalBias  30
-# define kHUDVerticalBias    45
-#endif
-
-#pragma mark - Private Functions
+#import "JNWThrottledBlock.h"
 
 static BOOL isDarkModeEnabled(void)
 {
@@ -34,8 +23,7 @@ static BOOL isDarkModeEnabled(void)
     return NO;
 }
 
-#pragma mark - Private Interface
-
+                                        #pragma mark - Interface
 @interface HUDWindowController ()
 
 @property (weak) IBOutlet NSTabView *tabView;
@@ -45,11 +33,28 @@ static BOOL isDarkModeEnabled(void)
 
 @end
 
-#pragma mark - Implementation
-
+                                        #pragma mark - Implementation
 @implementation HUDWindowController
+- (NSImage *)_cornerMask
+{
+    CGFloat radius = 12.0;
+    CGFloat dimension = 2 * radius;
+    NSSize size = NSMakeSize(dimension, dimension);
+    NSImage *image = [NSImage imageWithSize:size flipped:NO drawingHandler:^BOOL(NSRect dstRect) {
+        NSBezierPath *bezierPath = [NSBezierPath bezierPathWithRoundedRect:dstRect xRadius:radius yRadius:radius];
+        //        [[NSColor blackColor] set];
+        [bezierPath fill];
+        return YES;
+    }];
+    image.capInsets = NSEdgeInsetsMake(radius, radius, radius, radius);
+    image.resizingMode = NSImageResizingModeStretch;
+    return image;
+}
 
-#pragma mark Theme Switch
+- (NSImage *)cornerMask
+{
+    return [self _cornerMask];
+}
 
 - (void)adaptUI
 {
@@ -75,6 +80,7 @@ static BOOL isDarkModeEnabled(void)
             NSAppearanceName cvappn = (themeState) ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua;
             [self.window.contentView setAppearance:[NSAppearance appearanceNamed:cvappn]];
         }
+        _visualEffectView.maskImage = self.cornerMask;
     }
 
     NSArray *imagePathContents = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:_imagesPath error:nil];
@@ -100,8 +106,7 @@ static BOOL isDarkModeEnabled(void)
     [_image setImage:[_bezelImages valueForKey:_currImgName]];
 }
 
-#pragma mark - Set HUD
-
+                                        #pragma mark - Set HUD Type
 - (void)updateImageForAction:(bezel_action_t)action
 {
     NSString *imageName;
@@ -118,18 +123,23 @@ static BOOL isDarkModeEnabled(void)
     _currImgName = imageName;
 }
 
-#pragma mark - HUD Interaction
-
+                                        #pragma mark - HUD Interaction
 - (void)setProgressVolumeWithSliderDoubleValue:(double)doubleValue maxValue:(double)maxValue
 {
-    if (NSApp.currentEvent.type == NSEventTypeLeftMouseUp)
-        [_volumeSound play];
-
-    Float32 currSliderVolumeEquivalent = doubleValue / maxValue;
-    [VolumeControl setVolumeLevel:currSliderVolumeEquivalent];
-    [self updateImageForAction:kBezelActionVolume];
+    /// pressing shift plays / mutes feedback sound according to inverse of current system setting
+    if (NSApp.currentEvent.type == NSEventTypeLeftMouseUp) {
+        BOOL volumeFeedbackSoundEnabled = [VolumeControl getVolumeFeedbackSoundEnabled];
+        if ((volumeFeedbackSoundEnabled && !(NSApp.currentEvent.modifierFlags&NSEventModifierFlagShift)) || (!volumeFeedbackSoundEnabled && (NSApp.currentEvent.modifierFlags&NSEventModifierFlagShift)))
+            [kVolumeFeedbackSound play];
+    }
+    
+    /// basic throttling to reduce CPU load when changed via mouse
+    [JNWThrottledBlock runBlock:^{
+        Float32 currSliderVolumeEquivalent = doubleValue / maxValue;
+        [VolumeControl setVolumeLevel:currSliderVolumeEquivalent];
+        [self updateImageForAction:(VolumeControl.muted ? kBezelActionMute : kBezelActionVolume)];
+    } withIdentifier:@"sliderAction" throttle:0.05];
 }
-
 - (IBAction)sliderAction:(id)sender
 {
     assert(sender != nil);
@@ -155,11 +165,11 @@ static BOOL isDarkModeEnabled(void)
             break ;
     }
 
-    [self scheduleCloseTimerWithInterval:2.5];
+    self.window.alphaValue = 1.0f;
+    [self scheduleCloseTimerWithInterval:1.5f];
 }
 
-#pragma mark - Open & Close
-
+                                        #pragma mark - Show / Hide
 - (void)showWindow:(id)sender
 {
     NSScreen *mouseScreen;
@@ -170,9 +180,8 @@ static BOOL isDarkModeEnabled(void)
             mouseScreen = screen;
 
     NSRect mouseScreenRect = mouseScreen.frame;
-    NSRect mouseScreenVisibleRect = mouseScreen.visibleFrame;
-
-    NSPoint pt = NSMakePoint(mouseScreenVisibleRect.origin.x + kHUDHorizontalBias, mouseScreen.frame.origin.y + mouseScreenRect.size.height - self.window.frame.size.height - kHUDVerticalBias);
+    
+    NSPoint pt = NSMakePoint(mouseScreenRect.size.width - [self.window frame].size.width - 5, 5);
 
     [self.window setFrameOrigin:pt];
 
@@ -181,7 +190,19 @@ static BOOL isDarkModeEnabled(void)
 
 - (void)scheduleCloseTimerWithInterval:(NSTimeInterval)interval
 {
-    _closeWindowTimer = [NSTimer scheduledTimerWithTimeInterval:interval target:self selector:@selector(close) userInfo:nil repeats:NO];
+    [_closeWindowTimer invalidate];
+    _closeWindowTimer = [NSTimer scheduledTimerWithTimeInterval:interval target:self selector:@selector(fadeOut) userInfo:nil repeats:NO];
+}
+
+- (void)fadeOut
+{
+    [_closeWindowTimer invalidate];
+    [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+        context.duration = 0.15f;
+        self.window.animator.alphaValue = 0.0f;
+    } completionHandler:^{
+        close(0);
+    }];
 }
 
 - (void)showHUDForAction:(bezel_action_t)action sliderFilled:(double)filled sliderMax:(double)max textStringValue:(NSString * __nullable)tsval
@@ -205,17 +226,10 @@ static BOOL isDarkModeEnabled(void)
     [_slider setTag:(NSInteger)action];
 
     [self updateImageForAction:action];
+    [self.window setAlphaValue: 1.0f];
 
     [self showWindow:nil];
-    [self scheduleCloseTimerWithInterval:2];
-}
-
-#pragma mark - Properties
-
-- (void)setVolumeSoundPath:(NSString * __nullable)volumeSoundPath
-{
-    _volumeSoundPath = (volumeSoundPath) ? volumeSoundPath : kDefaultVolumeSoundPath;
-    _volumeSound = [[NSSound alloc] initWithContentsOfFile:_volumeSoundPath byReference:YES];
+    [self scheduleCloseTimerWithInterval:0.75f];
 }
 
 #pragma mark - Init
@@ -254,8 +268,6 @@ static BOOL isDarkModeEnabled(void)
 
     _previousThemeState = isDarkModeEnabled();
     [self adaptUI];
-
-    [self setVolumeSoundPath:nil]; // set default value
 }
 
 @end

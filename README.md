@@ -1,3 +1,17 @@
+(ONLY TESTED ON MOJAVE 10.14)
+
+This is my fork of MLforAll/NewBezelServices, implementing some new and altered functionality according to my own preferences:
+- moved the HUD window to bottom-right and shortened delay
+- throttled calls when changing volume via mouse interaction with HUD
+- added optional key remapping of volume keys:
+  - switchable via shell with 'defaults write com.mlforall.NewBezelServices RemapKeys -bool [true|false]'
+  - default behaviour becomes smaller increments (as normally accessed with alt + shift + key)
+  - pressing cmd, alt or ctrl reverts to standard increments
+  - pressing shift still plays / mutes feedback sound according to inverse of current system setting
+  - removes shortcut to Sound prefpane (as normally accessed with alt + key)
+- experiments with checking / granting / monitoring Accessibility Access, as required with 10.14 when remapping key events
+
+
 # NewBezelServices
 
 This app is a replacement for macOS HUD (for volume, brightness, etc...)

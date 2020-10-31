@@ -16,6 +16,7 @@
     if (self)
     {
         self.styleMask |= NSWindowStyleMaskBorderless;
+        self.hasShadow = NO;
         [self setOpaque:NO];
         [self setBackgroundColor:[NSColor clearColor]];
         if (@available(macOS 10.9, *))
@@ -27,8 +28,9 @@
 - (void)setContentView:(__kindof NSView *)contentView
 {
     [contentView setWantsLayer:YES];
-    [contentView.layer setCornerRadius:12.0f];
-    [contentView.layer setBackgroundColor:[NSColor colorWithCalibratedRed:0 green:0 blue:0 alpha:0.75].CGColor];
+//    [contentView.layer setCornerRadius:12.0f];
+    [contentView.layer setBackgroundColor:[NSColor colorWithCalibratedRed:0 green:0 blue:0 alpha:0.0].CGColor];
+    contentView.layer.masksToBounds = YES;
 
     [super setContentView:contentView];
 }

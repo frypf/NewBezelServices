@@ -14,7 +14,6 @@
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
 + (AudioDeviceID)defaultOutputDeviceID
 {
     AudioDeviceID outputDeviceID = kAudioObjectUnknown;
@@ -122,7 +121,6 @@
 
 + (void)setVolumeLevel:(Float32)level
 {
-    // TODO: Redesign
     BOOL muted = [self isAudioMuted];
     if (muted && level > 0)
         [self setMuted:NO];
@@ -141,7 +139,11 @@
                                         sizeof(Float32),
                                         &level); // deprecated
 }
-
 #pragma GCC diagnostic pop
+
++ (BOOL)getVolumeFeedbackSoundEnabled
+{
+    return ([[[NSUserDefaults.standardUserDefaults persistentDomainForName:NSGlobalDomain] objectForKey:@"com.apple.sound.beep.feedback"] boolValue]);
+}
 
 @end
