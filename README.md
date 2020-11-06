@@ -4,7 +4,7 @@
 - *moved the HUD window to bottom-right and shortened delay*
 - *throttled calls when changing volume via mouse interaction with HUD*
 - *added optional remapping of volume keys:*
-  - *switchable via shell with 'defaults write com.mlforall.NewBezelServices RemapKeys -bool [true|false]'*
+  - *switchable via shell with 'defaults write com.mlforall.NewBezelServices RemapKeys -int [1|0]'*
   - *default behaviour becomes smaller increments (as normally accessed with alt + shift + key)*
   - *pressing cmd, alt or ctrl reverts to standard increments*
   - *pressing shift still plays / mutes feedback sound according to inverse of current system setting*
