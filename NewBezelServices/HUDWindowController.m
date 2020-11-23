@@ -246,6 +246,9 @@ static BOOL isDarkModeEnabled(void)
     else
         _imagesPath = ELCAP_IMAGESPATH;
 
+    [self.window setAccessibilityRole:@"HUDWindow"];
+    [self.window setAccessibilitySubrole:@"AXUnknown"];
+
     [self.window setCanBecomeVisibleWithoutLogin:YES];
     [self.window setLevel:kCGMaximumWindowLevel];
     [self.window setMovable:NO];
